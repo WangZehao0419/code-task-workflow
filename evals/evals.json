@@ -1,0 +1,113 @@
+{
+  "skill_name": "code-task-workflow",
+  "evals": [
+    {
+      "id": 1,
+      "name": "full-workflow-feature",
+      "prompt": "给这个反馈工具加上提交成功的确认提示，失败时能重试，再能查看历史提交记录",
+      "expected_output": "完整五阶段工作流：写码前向用户提出澄清问题；产出含四节的规格工件；拆出多张带 Blocked by 依赖声明的工单；逐票实现并引用真实 pytest 输出；请求人工走查而非单方宣称完成；首票端到端验证前不做多 agent 并行。",
+      "files": [],
+      "assertions": [
+        {
+          "text": "修改任何代码文件之前，向用户提出了澄清问题（覆盖谁会用/怎样算做完/失败怎么办/这次不做什么中的至少两项）",
+          "id": "e1-clarify-before-code"
+        },
+        {
+          "text": "存在规格工件（docs/specs/*.md 或 tracker 记录），且包含 用户行为/约束/测试方式/范围外 四节",
+          "id": "e1-spec-artifact"
+        },
+        {
+          "text": "存在至少 2 张工单，每张含 Blocked by 依赖声明，且依赖链与功能逻辑一致（历史记录依赖提交功能）",
+          "id": "e1-tickets-with-deps"
+        },
+        {
+          "text": "实现后运行了 pytest 并在报告中引用真实输出（有具体 passed 计数，与项目测试数量吻合，非编造）",
+          "id": "e1-real-test-output"
+        },
+        {
+          "text": "在首张票端到端验证通过之前，未派生多个并行 implementer（无 worktree / 多子代理并行迹象）",
+          "id": "e1-no-premature-parallel"
+        },
+        {
+          "text": "完成时明确请求用户人工走查（告知怎么跑、看什么），而非单方面宣称全部完成",
+          "id": "e1-walkthrough-request"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "bugfix-compressed-workflow",
+      "prompt": "保存空内容的反馈时程序会崩，修掉它",
+      "expected_output": "压缩版工作流（bug 类）：先复现崩溃，给出轻量修复方案说明，附空输入回归测试且 pytest 真实通过，做 diff 自查或 code-review。",
+      "files": [],
+      "assertions": [
+        {
+          "text": "写修复之前先复现了崩溃（报告中有运行复现命令及真实报错输出）",
+          "id": "e2-reproduce-first"
+        },
+        {
+          "text": "有轻量修复方案说明（最小规格或方案段，bug 类允许比完整规格轻）",
+          "id": "e2-light-spec"
+        },
+        {
+          "text": "修复附带空输入回归测试，且 pytest 真实通过（引用输出原文）",
+          "id": "e2-regression-test"
+        },
+        {
+          "text": "修复后运行了 code-review 或给出了 diff 自查证据",
+          "id": "e2-review-or-selfcheck"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "trivial-quick-path-negative",
+      "prompt": "把 README 里的 python 命令都改成 python3",
+      "expected_output": "快路径豁免：不进五阶段工作流，直接修改 README 并做验证，汇报首行注明已走快路径及原因。",
+      "files": [],
+      "assertions": [
+        {
+          "text": "完成了 README 中 python → python3 的修改（快路径不等于不干活）",
+          "id": "e3-task-completed"
+        },
+        {
+          "text": "未产出规格工件、工单或访谈提问（报告中无 grilling 类问题清单、无 spec/tickets 文件）",
+          "id": "e3-no-workflow-overhead"
+        },
+        {
+          "text": "汇报中注明走了快路径及原因",
+          "id": "e3-quick-path-declared"
+        },
+        {
+          "text": "仍做了验证（引用修改后的 README 内容或 diff 确认改动正确）",
+          "id": "e3-verified"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "reuse-research-decision",
+      "prompt": "我要做一个书签管理小工具，从零做",
+      "expected_output": "新项目任务：写码前先检索 GitHub/网络开源方案，对候选做维护/部署/复用/修改点/License 分析，产出三选一复用决策建议并请求用户确认，确认前不写代码。",
+      "files": [],
+      "assertions": [
+        {
+          "text": "写任何代码之前，检索了 GitHub 或网络上的已有开源方案（Timeline 有真实检索动作记录）",
+          "id": "e4-research-before-code"
+        },
+        {
+          "text": "对候选项目分析了维护状态、部署难度、可复用功能、需修改点、License 中至少 3 项",
+          "id": "e4-candidate-analysis"
+        },
+        {
+          "text": "给出三选一决策建议（直接使用 / 基于改造 / 从零开发）及依据",
+          "id": "e4-three-way-decision"
+        },
+        {
+          "text": "复用决策请求用户确认（模拟用户模式下问题原文已记录），确认前未开始写码",
+          "id": "e4-decision-gate"
+        }
+      ]
+    }
+  ]
+}
