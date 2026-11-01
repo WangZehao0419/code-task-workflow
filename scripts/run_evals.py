@@ -132,7 +132,9 @@ def judge_assertion(a, project, fixture_src, cmd_res, timeout):
             return "unrun", "file_contains 无命中文件（paths 展开为空）"
         hit_count, misses = 0, []
         for pat in patterns:
-            rx = re.compile(pat)
+            # MULTILINE：起始/行尾锚定模式（如 ^#{1,6}\s*Reproduction）按行匹配，
+            # 与 schema「五节标题齐全」语义一致；无锚点模式不受影响。
+            rx = re.compile(pat, re.MULTILINE)
             found = False
             for rel in paths:
                 fp = os.path.join(project, rel)

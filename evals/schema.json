@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "code-task-workflow eval contract v1.6.0",
+  "title": "code-task-workflow eval contract v1.7.0",
   "description": "评测契约：场景定义、断言、触发测试集与 run-log。校验器 scripts/validate_evals.py 按本文件手写实现（不依赖 jsonschema 库）。兼容性约定：id/name/prompt/expected_output/files/assertions 为 v1.5 兼容字段，永久保留；type/runner_mode 等为 v1.6 新增。语义必需字段别名表与 references/phases.md 阶段② 的 canonical schema 保持一致。",
   "type": "object",
   "required": ["skill_name", "evals"],

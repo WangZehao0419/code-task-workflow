@@ -23,7 +23,7 @@ PROTO_SKILLS = {
     "implement": "implement",
     "implement-spec": "implement-spec",
     "retro": "retro",
-    "domain-modeling": "domain-modeling-2",  # 逻辑名映射（SKILL.md 第 4 节）
+    "domain-modeling": "domain-modeling-2",  # 逻辑名映射（references/invocation.md 解析规则第 3 条）
 }
 
 # SKILL.md 应引用的本技能内文件（交付完整性）
@@ -92,12 +92,31 @@ def check_links(errors):
                 errors.append("%s: 链接目标不存在：%s" % (os.path.relpath(path, eval_lib.SKILL_ROOT), target))
 
 
+def _skills_root_candidates():
+    """协议技能候选安装根：环境变量 > 仓库同级目录（安装态布局） > 用户级安装目录。"""
+    roots = []
+    env_root = os.environ.get("SKILLS_ROOT")
+    if env_root:
+        roots.append(env_root)
+    if SKILLS_ROOT not in roots:
+        roots.append(SKILLS_ROOT)
+    home = os.path.expanduser("~")
+    for sub in (os.path.join(home, ".zcode", "skills"),
+                os.path.join(home, ".workbuddy", "skills")):
+        if sub not in roots:
+            roots.append(sub)
+    return roots
+
+
 def check_proto_skills(errors):
+    roots = _skills_root_candidates()
     for logical, physical in PROTO_SKILLS.items():
-        pdir = os.path.join(SKILLS_ROOT, physical)
-        pfile = os.path.join(pdir, "SKILL.md")
-        if not os.path.isfile(pfile):
-            errors.append("协议技能缺失：%s（物理目录 %s）" % (logical, os.path.relpath(pfile, SKILLS_ROOT)))
+        hits = [r for r in roots if os.path.isfile(os.path.join(r, physical, "SKILL.md"))]
+        if not hits:
+            errors.append(
+                "协议技能缺失：%s（已在以下根目录查找：%s）"
+                % (logical, "；".join(os.path.abspath(r) for r in roots))
+            )
 
 
 def check_internal_refs(errors):

@@ -1,6 +1,6 @@
 {
   "skill_name": "code-task-workflow",
-  "contract_version": "1.6.0",
+  "contract_version": "1.7.0",
   "evals": [
     {
       "id": "e1",
@@ -81,7 +81,7 @@
         },
         {
           "id": "e1-no-premature-parallel",
-          "text": "并行事件约束（SKILL.md 第 6 节）：首票端到端验证通过（e2e_gate_pass）之前事件日志中无 implementer_spawn、无 worktree_create（reviewer_spawn 不受限，reviewer 不计入 implementer 并行）",
+          "text": "并行事件约束（references/tickets.md）：首票端到端验证通过（e2e_gate_pass）之前事件日志中无 implementer_spawn、无 worktree_create（reviewer_spawn 不受限，reviewer 不计入 implementer 并行）",
           "kind": "machine",
           "evidence": {
             "type": "event_log",
@@ -100,7 +100,7 @@
           "evidence": {
             "type": "file_contains",
             "paths": ["verification.md"],
-            "patterns": ["未验证|(?i)unverified"]
+            "patterns": ["(?i)未验证|unverified"]
           }
         },
         {
@@ -508,7 +508,7 @@
           "evidence": {
             "type": "file_contains",
             "paths": ["report.md"],
-            "patterns": ["未配置 tracker|(?i)issue-tracker.*缺失|(?i)no.*tracker", "本地文件模式|(?i)local.file"],
+            "patterns": ["(?i)未配置 tracker|issue-tracker.*缺失|no.*tracker", "(?i)本地文件模式|local.file"],
             "mode": "all"
           }
         },
@@ -670,7 +670,7 @@
           "evidence": {
             "type": "file_contains",
             "paths": ["docs/specs/*.md"],
-            "patterns": ["修订|(?i)revision|变更记录"]
+            "patterns": ["(?i)修订|revision|变更记录"]
           }
         },
         {
@@ -706,7 +706,7 @@
           "evidence": {
             "type": "file_contains",
             "paths": ["handoff.md"],
-            "patterns": ["阶段|(?i)phase", "交接|位置|(?i)location|artifact", "下一步|(?i)next"],
+            "patterns": ["(?i)阶段|phase", "(?i)交接|位置|location|artifact", "(?i)下一步|next"],
             "mode": "all"
           }
         },

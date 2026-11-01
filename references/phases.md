@@ -1,6 +1,6 @@
 # 五阶段操作卡
 
-每张卡包含：目标 / 动作序列 / 调用指令 / 交接物 / 出口 checklist / 常见失败。主文件 SKILL.md 的路由表按阶段编号索引到本文件。手动型技能（磁盘协议调用）的路径表与解析规则见 SKILL.md 第 4 节；门控以 SKILL.md 第 5 节 Gate Registry 的 G1-G7 唯一编号引用。
+每张卡包含：目标 / 动作序列 / 调用指令 / 交接物 / 出口 checklist / 常见失败。主文件 SKILL.md 的路由表按阶段编号索引到本文件。手动型技能（磁盘协议调用）的路径表与解析规则见 references/invocation.md；门控以 SKILL.md 第 5 节 Gate Registry 的 G1-G7 唯一编号引用。
 
 ## 阶段① 问清需求
 
@@ -10,9 +10,9 @@
 
 1. 先自查：列出悬而未决的问题，标出哪些能从代码、文档、现有测试中找到答案 → 自己读代码回答，**不把查资料变成问用户**。
 2. 交互效果光聊定不下来（布局、流程、手感）→ 调用 Skill `prototype` 做一个可运行的小原型，体验后再决定。
-3. 调用 Skill `grilling` 对剩余问题逐条访谈；涉及领域词汇、边界概念 → 调用 Skill `domain-modeling`（通道 B 磁盘读取时用物理目录 `domain-modeling-2`，见 SKILL.md 第 4 节）沉淀 ADR 与词汇表。
+3. 调用 Skill `grilling` 对剩余问题逐条访谈；涉及领域词汇、边界概念 → 调用 Skill `domain-modeling`（通道 B 磁盘读取时用物理目录 `domain-modeling-2`，见 references/invocation.md）沉淀 ADR 与词汇表。
 4. **方案调研**（新项目 / 新功能 / 新独立模块时执行；bug 修复与既有架构内的小改动跳过）：先检索再写码。用 GitHub 搜索与网络搜索，以已澄清的需求为关键词，找可直接使用或二次开发的开源项目。对候选逐项分析：是否仍在维护（最近提交 / release / issue 活跃度、是否归档）、部署是否简单、哪些功能可直接复用、哪些地方需要修改、License 是否与本项目兼容。产出三选一建议——**直接使用 / 基于改造 / 从零开发**——并给出最快跑通 MVP 的路径。**建议与依据交用户拍板**（G2，hard gate）。检索工具不可用时如实告知、标注"未做方案调研"，由用户决定继续或停止。既有架构内的小型功能增强，调研可在 1–2 次检索内收口、无需展开完整候选分析（见 SKILL.md 第 3 节流程压缩）。
-5. （用户明确要求完整版时）Read `grill-with-docs` 的 SKILL.md（路径见 SKILL.md 第 4 节）按其协议执行；grill-with-docs 与直接调用 grilling / domain-modeling 互斥，不得重复访谈。
+5. （用户明确要求完整版时）Read `grill-with-docs` 的 SKILL.md（路径见 references/invocation.md）按其协议执行；grill-with-docs 与直接调用 grilling / domain-modeling 互斥，不得重复访谈。
 
 **调用指令模板**
 
@@ -37,7 +37,7 @@
 
 **动作序列**
 
-1. Read `to-spec` 的 SKILL.md（路径见 SKILL.md 第 4 节），按协议执行；无 tracker 配置时注入本地文件模式（见 SKILL.md 第 2 节），规格写 `docs/specs/<slug>.md`。
+1. Read `to-spec` 的 SKILL.md（路径见 references/invocation.md），按协议执行；无 tracker 配置时注入本地文件模式（见 SKILL.md 第 2 节），规格写 `docs/specs/<slug>.md`。
 2. 探索代码库现状（若阶段① 尚未充分探索）；全文使用项目领域词汇，尊重既有 ADR。
 3. 规划测试 seam：优先既有 seam，能用高层不用低层，新 seam 提在最高处；**seam 方案交用户确认**（G3，hard gate）。
 4. 按 canonical schema 写规格并发布：tracker 配置存在 → 按 tracker 发布并打 ready-for-agent 标签；否则本地写 `docs/specs/<slug>.md` 并注明本地文件模式。
@@ -91,11 +91,11 @@
 
 **动作序列**
 
-1. Read `to-tickets` 的 SKILL.md（路径见 SKILL.md 第 4 节），按协议执行。无 tracker 时注入本地文件模式：`.scratch/<slug>/issues/<NN>-<slug>.md`，每票一个文件，Blocked by 以文本声明。
+1. Read `to-tickets` 的 SKILL.md（路径见 references/invocation.md），按协议执行。无 tracker 时注入本地文件模式：`.scratch/<slug>/issues/<NN>-<slug>.md`，每票一个文件，Blocked by 以文本声明。
 2. 按"用户行为"切片，不按技术层切片：表单+接口+存储+成功提示是一票，不是四票。
 3. 找 prefactor 机会——"先让改动变容易，再做容易的改动"，但每张 prefactor 票同样要能验证。
 4. **工单清单与依赖关系交用户确认**（G4，hard gate）。
-5. 确认后各票落状态 `approved`（状态机见 SKILL.md 第 6 节）；根票 Blocked by 声明为 `None`，不得留空。
+5. 确认后各票落状态 `approved`（状态机见 references/tickets.md）；根票 Blocked by 声明为 `None`，不得留空。
 
 **拆分检查三问**：每票能演示吗？依赖明确吗？完成可判定吗？
 
@@ -112,6 +112,8 @@
 
 **目标**：一票一票实现，每票都有真实验证证据，验收后才算完成。
 
+**前置**：动手实现前，按 SKILL.md 第 0 节读 references/coding-style.md；改动涉及新增校验、判空、try/except、锁、默认值等防御性代码时，加读 references/defensive-code.md。
+
 **动作序列（单票，固定顺序执行）**
 
 1. 记录票开始前的 **baseline commit**（或 integration tip），作为本票 review 与回退的 fixed point；票状态置 `implementing`。
@@ -125,7 +127,7 @@
 9. 用户确认后票状态置 `walkthrough-approved`；最后 commit，票状态置 `done`。
 10. **只有 `done` 的票解除下游 Blocked by**；未通过 G5 / G6 的票不得 `done`，也不得解除下游。
 
-**并行升级**：满足 SKILL.md 第 6 节 G7 全部条件后，Read `implement-spec` 的 SKILL.md（路径按 SKILL.md 第 4 节的模式）按协议执行（worktree + 集成分支 + 实现者子代理 + context pointer 沟通）。并行事件规则（首票 E2E 前 `implementer_spawn = 0`、`worktree_create = 0`；reviewer 不得改实现；G7 未通过不得启动 implement-spec）见 SKILL.md 第 6 节。
+**并行升级**：满足 references/tickets.md 的 G7 全部条件后，Read `implement-spec` 的 SKILL.md（路径按 references/invocation.md 的模式）按协议执行（worktree + 集成分支 + 实现者子代理 + context pointer 沟通）。并行事件规则（首票 E2E 前 `implementer_spawn = 0`、`worktree_create = 0`；reviewer 不得改实现；G7 未通过不得启动 implement-spec）见 references/tickets.md。
 
 **出口 checklist（每票）**
 
@@ -145,7 +147,7 @@
 
 **动作序列**
 
-1. Read `retro` 的 SKILL.md（路径见 SKILL.md 第 4 节），按协议执行（读会话记录 / 执行日志）。
+1. Read `retro` 的 SKILL.md（路径见 references/invocation.md），按协议执行（读会话记录 / 执行日志）。
 2. 按类别找候选问题：
 
 | 遇到的问题 | 怎么改 |
@@ -168,7 +170,7 @@
 
 ## 降级操作卡：外部技能缺失时的内联最小流程
 
-> 触发条件（见 SKILL.md 第 7 节）：某阶段技能文件缺失、损坏，或通道 B 协议路径（按 SKILL.md 第 4 节 `<skills-root>` 规则解析）解析失败，或第 4 节解析规则第 6 条的递归依赖缺失。此时不调用对应外部技能，按本卡以本技能内联指引跑通五阶段最小流程。
+> 触发条件（见 SKILL.md 第 7 节）：某阶段技能文件缺失、损坏，或通道 B 协议路径（按 references/invocation.md `<skills-root>` 规则解析）解析失败，或 references/invocation.md 解析规则第 6 条的递归依赖缺失。此时不调用对应外部技能，按本卡以本技能内联指引跑通五阶段最小流程。
 
 **目标**：在专项技能不可用时仍跑通"访谈 → 规格 → 拆票 → 实现+验证 → 复盘"，保住门控与验收证据底线，产出质量不低于本卡"交接物"列出的质量下限。
 

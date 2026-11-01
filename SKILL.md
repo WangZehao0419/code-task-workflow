@@ -1,21 +1,19 @@
 ---
 name: code-task-workflow
-description: "代码任务全流程编排 + 编码纪律唯一事实源：非琐碎代码任务按五阶段推进（问清需求、写成规格、拆小任务、实现与验收、复盘），琐碎修改（单个交付文件、小 diff、无歧义）走快路径直接完成，单点任务（只写测试 / 只 review / 只访谈 / 只定位根因）让位给对应专项技能；技能内含「编码纪律」节，随技能加载对全部路径生效。适用：新功能实现、bug 修复、跨文件重构、配置或脚本变更、从需求到规格 / 工单 / 实现 / 验证的完整交付，或用户说“走工作流”“按流程来”“代码任务工作流”“完整做这个任务”“code workflow”“do this properly”。不适用：只做 code review、只写测试、只做需求访谈、只定位根因、纯知识问答、只运行现有测试并报告——这些让位给对应专项技能。Produces: 方案调研与复用三选一建议（直接用 / 改造 / 从零写）、规格文档、带依赖声明的工单、真实测试输出与验收证据、复盘清单。"
-version: 1.6.0
+description: "代码任务全流程编排：非琐碎代码任务按五阶段推进（问清需求、写成规格、拆小任务、实现与验收、复盘），琐碎修改（单个交付文件、小 diff、无歧义）走快路径直接完成，单点任务（只写测试 / 只 review / 只访谈 / 只定位根因）让位给对应专项技能；阶段操作卡与编码纪律按需加载——进入某阶段读 references/phases.md 对应章节，涉及代码变更先读 references/coding-style.md，涉及防御性代码加读 references/defensive-code.md。适用：新功能实现、bug 修复、跨文件重构、配置或脚本变更、从需求到规格 / 工单 / 实现 / 验证的完整交付，或用户说“走工作流”“按流程来”“代码任务工作流”“完整做这个任务”“code workflow”“do this properly”。不适用：只做 code review、只写测试、只做需求访谈、只定位根因、纯知识问答、只运行现有测试并报告——这些让位给对应专项技能。Produces: 方案调研与复用三选一建议（直接用 / 改造 / 从零写）、规格文档、带依赖声明的工单、真实测试输出与验收证据、复盘清单。"
+version: 1.7.0
 agent_created: true
 ---
 
 # 代码任务工作流（Code Task Workflow）
 
-你是编排器，不亲自提供各阶段的方法论。你的职责：判定任务走哪条路径、按正确顺序推进阶段、在每个阶段门口核实退出条件、在正确的时机把控制权交还给用户。
+你是编排器，不亲自提供各阶段的方法论。你的职责：判定任务走哪条路径、按正确顺序推进阶段、在每个阶段门口核实退出条件、在正确的时机把控制权交还给用户。本文件只做路由：各场景的规则正文在 references/ 下按需加载，未列入路由的文件不会被加载；新增规则文件时同步补入路由。
 
 > **底线：先跑通一个小任务端到端，再考虑多 agent 并行。**
 
-## 0. 编码纪律（全路径适用，唯一事实源）
+## 0. 编码纪律（全路径适用，正文见 references/coding-style.md）
 
-以下纪律是编码行为的唯一事实源，适用于三条路径（快路径 / 让位 / 完整工作流）的每一次代码变更；其中成功标准与验收证据同时由 G1-G7 门控及快路径证据要求强制。本节是全局行为纪律，不属于任何阶段的方法论。
-
-**优先级链**（冲突时从高到低裁定）：
+以下优先级链是全局裁定规则，适用于三条路径（快路径 / 让位 / 完整工作流）的每一次代码变更：
 
 ```text
 用户明确要求
@@ -25,15 +23,8 @@ agent_created: true
 > 通用建议
 ```
 
-- **总纲：每次执行任务遵循 Karpathy guidelines 四原则**：开工前调用 Skill `karpathy-guidelines` 逐条对照执行。Karpathy 状态全程只记录两种：`loaded`（已加载并对照执行）或 `unavailable_reported`（不可用且已显式报告）。技能不可用时在汇报中如实标注，**不阻塞最小流程**，按本节其余纪律执行。
-- 优先复用项目已有工具、模式与封装，确认无法满足再引入新依赖。
-- 实现简洁，避免过度抽象；未明确要求不主动重构、优化或扩展功能。
-- 修改时最小化变更，避免影响无关代码。
-- 代码注释遵循项目语言，只解释非显然的原因（“为什么”而非“做什么”）。
-- 开工前定义可验证的成功标准，把任务转化为可判定达成的判据；多步任务列出计划，每步标注验证点。
-- 每行变更须可追溯到已确认的用户请求、规格或工单；自己产生的孤儿代码必须清理，既有死代码标注后提请用户决定。
-- 完成后按成功标准逐项核验（正常路径、边界情况、异常路径），贴证据而非泛泛自检。
-- Debug：先定位根因再修改，不基于猜测连续改代码。
+- **总纲：每次执行任务遵循 Karpathy guidelines 四原则**：开工前调用 Skill `karpathy-guidelines` 逐条对照执行。Karpathy 状态全程只记录两种：`loaded`（已加载并对照执行）或 `unavailable_reported`（不可用且已显式报告）。技能不可用时在汇报中如实标注，**不阻塞最小流程**，按编码纪律正文执行。
+- **编码纪律正文按需加载**：凡涉及代码变更——快路径动手前、bugfix 压缩路径动手前、完整工作流进入阶段④ 前——Read [references/coding-style.md](references/coding-style.md)（一次任务读一次）。若改动会新增校验、判空、try/except、锁、默认值等防御性代码，或需 review 此类改动，同时 Read [references/defensive-code.md](references/defensive-code.md)。成功标准与验收证据同时由 G1-G7 门控及快路径证据要求强制。
 
 五个阶段依次为：① 问清需求 → ② 写成规格 → ③ 拆小任务 → ④ 实现与验收 → ⑤ 复盘改进。每阶段详细操作卡见 [references/phases.md](references/phases.md)，进入某阶段时读对应章节。
 
@@ -104,46 +95,15 @@ one_check = true          # 一次运行 / 测试即可验证结果
 
 **流程压缩**：完整五阶段允许按任务类型省略部分环节，但**门控与验收证据要求不可省略**：
 
-- bug 修复类：跳过方案调研（阶段① 动作 4），规格降为**轻量规格**（五节：Reproduction / Root Cause / Fix / Regression Test / Out of Scope，模板见 phases.md），仍须附回归测试并真实通过（G5）与用户走查（G6）。bugfix 压缩路径不强制落第 6 节的七态工单状态，但 G5 / G6 的实质证据不可省。
+- bug 修复类：跳过方案调研（阶段① 动作 4），规格降为**轻量规格**（五节：Reproduction / Root Cause / Fix / Regression Test / Out of Scope，模板见 phases.md），仍须附回归测试并真实通过（G5）与用户走查（G6）。bugfix 压缩路径不强制落 references/tickets.md 的七态工单状态，但 G5 / G6 的实质证据不可省。
 - 既有架构内的小型功能增强：方案调研可在 1–2 次检索内收口，无需展开完整候选分析；
 - 其余任务走完整五阶段。压缩了什么，在汇报中注明。
 
-## 4. 技能调用适配器（invocation adapter）
+## 4. 技能调用适配器（路由入口）
 
-技能分两类调用通道，解析规则如下：
+技能分两类调用通道：**通道 A — Skill 工具直接调用**（宿主提供 Skill API，且技能 frontmatter 的 `name` 可被解析）；**通道 B — 磁盘协议**（grill-with-docs / to-spec / to-tickets / implement / implement-spec / retro 等设置了 disable-model-invocation 的技能，Read 其 SKILL.md 执行）。
 
-**通道 A — Skill 工具直接调用**（宿主提供 Skill API，且技能 frontmatter 的 `name` 可被解析）：
-
-> 调用 Skill 工具（skill: `tdd`），在以下 seam 处驱动实现：<列出 seam>。仅在这些 seam 写测试先行代码。
-
-**通道 B — 磁盘协议**（grill-with-docs / to-spec / to-tickets / implement / implement-spec / retro 设置了 disable-model-invocation，不能经 Skill 工具调用）：
-
-> Read `<skills-root>/<物理目录>/SKILL.md`，严格按该协议执行。协议内含的用户确认环节必须原样保留，不得跳过或自动化。产出物路径按第 2 节的 tracker 回退规则调整。
-
-**解析规则**（按序裁定）：
-
-1. **逻辑技能**按 frontmatter 的 `name` 解析（经 Skill API 调用）。
-2. **磁盘协议技能**按物理目录解析（Read 文件）。
-3. **逻辑名与物理目录映射**：逻辑名 `domain-modeling` 的物理目录为 `domain-modeling-2`。通道 A 用逻辑名调 Skill API；通道 B 磁盘读取必须用物理目录，禁止直接拼逻辑名。
-4. 有 Skill API 时优先走通道 A；无 Skill API（或解析失败）时按通道 B Read 对应 SKILL.md，执行内联最小流程。
-5. **互斥**：grill-with-docs 与直接调用 grilling / domain-modeling 互斥——同一任务只走其一，不得重复访谈、不得重复写 ADR。
-6. **递归依赖检查**：进入协议前检查其声明的上游依赖是否可用——retro → writing-for-agents；tdd → tests.md / mocking.md（若协议引用）；implement-spec → 宿主 worktree / subagent / merge 能力。缺失时按第 7 条降级。
-7. **协议文件存在 ≠ 宿主能力存在**：宿主不支持 worktree、后台 subagent 或 merge 时，自动回退到 implement 串行，不启动 implement-spec。
-8. **关键依赖缺失时**，在首次可见状态消息中标注“已降级”，说明缺失路径、受影响阶段和替代流程，不得静默跳过。
-
-**`<skills-root>` 解析（可移植规则，禁止写死宿主路径）**：协议技能与本技能同级安装——取本 SKILL.md 自身的所在目录，其父目录即 `<skills-root>`。示例：本技能装在 `~/.workbuddy/skills/code-task-workflow/` 时为 `~/.workbuddy/skills`；装在 `~/.zcode/skills/code-task-workflow/` 时为 `~/.zcode/skills`。下表仅为路径形态示例，任何 harness 按上式解析，不做宿主假设。
-
-| 阶段 | 磁盘协议路径（`<skills-root>` 按上式解析） |
-|---|---|
-| ① | `<skills-root>/grill-with-docs/SKILL.md` |
-| ② | `<skills-root>/to-spec/SKILL.md` |
-| ③ | `<skills-root>/to-tickets/SKILL.md` |
-| ④ | `<skills-root>/implement/SKILL.md`（并行时换 implement-spec） |
-| ⑤ | `<skills-root>/retro/SKILL.md` |
-
-**路径解析失败的处理**：执行通道 B 前先解析协议路径。若无法确定本技能所在目录、或 `<skills-root>/<name>/SKILL.md` 不存在，**报告失败的具体路径与原因，并按第 7 节降级为内联最小流程**（首条可见状态消息标注“已降级”），不得静默跳过、也不得凭猜测的协议继续。
-
-若读到的协议与本技能门控冲突，以更严格的门控为准。
+通道调用指令模板、解析规则（含逻辑名与物理目录映射、互斥、递归依赖检查、能力降级）、`<skills-root>` 定位与各阶段磁盘路径表见 [references/invocation.md](references/invocation.md)——**首次调用外部技能或走通道 B 前读取**；路径解析失败时同样按该文件处理（报告具体路径与原因，按第 7 节降级，不得静默跳过或凭猜测的协议继续）。
 
 ## 5. Gate Registry（唯一门控注册表）
 
@@ -160,7 +120,7 @@ one_check = true          # 一次运行 / 测试即可验证结果
 | G4 | 工单拆分确认 | user-confirmation | 阶段③ 拆票后 | 工单清单与 Blocked by 依赖关系经用户点头 |
 | G5 | 真实验证与 review 完成 | evidence-based | 阶段④ 每票实现后 | fresh verification 证据（命令、完整 stdout/stderr、退出码、passed/failed/skipped 计数）+ code-review 完成且问题已处理或说明；旧输出、部分测试、agent 自报成功均不可替代 |
 | G6 | 用户人工走查确认 | user-confirmation | 阶段④ 每票 G5 通过后 | 用户确认走查（告知运行命令、操作步骤、预期结果）；未获确认不得宣称该票完成 |
-| G7 | 并行升级确认 | user-confirmation | 从 implement 串行切 implement-spec 前 | 第 6 节并行条件全部满足，含用户明确同意与宿主能力核实 |
+| G7 | 并行升级确认 | user-confirmation | 从 implement 串行切 implement-spec 前 | references/tickets.md 的并行升级条件全部满足，含用户明确同意与宿主能力核实 |
 
 门控指令模板：
 
@@ -168,33 +128,9 @@ one_check = true          # 一次运行 / 测试即可验证结果
 
 **合并提问**：多个 user-confirmation 门控可合并为一次提问（例如 G1 与 G2 一次问完），但每一项确认都必须得到用户的明确回应，不得因合并而省略任何一项。evidence-based 门控不参与合并提问，由证据独立判定。
 
-## 6. 工单状态与并行升级
+## 6. 工单状态与并行升级（路由入口）
 
-**工单状态机**（仅约束完整工作流的工单；快路径与 bugfix 压缩路径不强制落全状态，见第 3 节流程压缩）：
-
-```text
-draft -> approved -> implementing -> verified -> reviewed -> walkthrough-approved -> done
-```
-
-- `draft`：拆票产出；`approved`：G4 通过；`implementing`：实现开始；`verified`：G5 真实验证通过；`reviewed`：code-review 完成且问题已处理；`walkthrough-approved`：G6 用户走查确认；`done`：最终 commit 完成。
-- **只有 `done` 的票才能解除下游 Blocked by**；阶段⑤ 只有所有票为 `done` 后才能进入。
-- 未通过 G5 / G6 的票不得标记 `done`，也不得解除下游依赖。
-
-**并行升级条件（G7）——全部满足才可从 implement 串行切换到 implement-spec 多 agent 并行**：
-
-1. 至少 1 张票已端到端跑通（真实测试通过，非“应该没问题”）；
-2. 依赖图明确，每张待做票的 Blocked by 均已 `done` 或不存在；
-3. 用户明确同意并行；
-4. 宿主具备 worktree + 集成分支 + subagent + merge 能力（协议见 implement-spec 磁盘文件）。
-
-任一不满足 → 继续串行。
-
-**并行事件规则**（事件日志可核查）：
-
-- 首票 E2E gate 通过前 `implementer_spawn = 0`，`worktree_create = 0`；
-- `reviewer_spawn` 可以存在，但 reviewer 不得修改实现（reviewer 是只读角色，**不计入 implementer 并行**）；
-- G7 未通过前不得启动 implement-spec；
-- 未通过 G5 / G6 的票不能标记 done，也不能解除下游依赖。
+完整工作流的工单按七态状态机流转（`draft → approved → implementing → verified → reviewed → walkthrough-approved → done`），状态语义、G7 并行升级条件与并行事件规则见 [references/tickets.md](references/tickets.md)——**阶段③ 拆票落状态、阶段④ 每票流转或评估并行升级前读取**。底线：只有 `done` 的票解除下游 Blocked by；阶段⑤ 要求所有票 `done`。
 
 ## 7. 失败与回退
 
@@ -205,9 +141,4 @@ draft -> approved -> implementing -> verified -> reviewed -> walkthrough-approve
 
 ## 8. 评测与回归（eval 契约）
 
-本技能的可回归验证由 `evals/` 承担：`evals/evals.json`（场景与断言）、`evals/schema.json`（契约）、`evals/fixtures/`（可复现夹具）、`scripts/validate_evals.py`（契约校验）、`scripts/run_evals.py`（运行与 run-log 归档）。
-
-- 快速校验：`python scripts/validate_evals.py`。
-- 运行：`python scripts/run_evals.py --all --repeat 3 --baseline` / `--with-skill`。
-- 成本画像（tokens / tool_calls / latency 与 50% 退化报警）**仅在 eval runner 中采集**；普通代码任务不因 `timing.json` / `benchmark.json` 缺失而阻塞。
-- 触发测试集（路由正反例）与 manual 类 eval 的运行语义见 `evals/schema.json` 的 `runner_mode` 字段：manual 结果不得伪装成机器通过。
+本技能的可回归验证由 `evals/` 承担：`evals/evals.json`（场景与断言）、`evals/schema.json`（契约）、`evals/fixtures/`（可复现夹具）、`scripts/validate_evals.py`（契约校验）、`scripts/run_evals.py`（运行与 run-log 归档）。契约字段、runner_mode 语义与命令用法见 [references/eval-contract.md](references/eval-contract.md)（维护评测时读取）。

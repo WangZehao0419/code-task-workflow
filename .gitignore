@@ -2,4 +2,7 @@
 temp/
 .scratch/
 evals/runs/
+evals/evidence/
 __pycache__/
+*.pyc
+.zcode/
