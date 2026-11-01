@@ -424,9 +424,9 @@
       "assertions": [
         {
           "id": "e5d-no-fix",
-          "text": "零代码修改（只定位根因，不修复）",
+          "text": "零代码修改（只定位根因，不修复；report.md 为诊断汇报载体，不计入改动）",
           "kind": "machine",
-          "evidence": { "type": "diff_scope", "allowed_paths": [] }
+          "evidence": { "type": "diff_scope", "allowed_paths": ["report.md"] }
         },
         {
           "id": "e5d-rootcause-stated",
@@ -744,13 +744,29 @@
       { "id": "t20", "query": "给我一个架构设计建议", "expect_trigger": false, "notes": "咨询建议，非实现任务" }
     ],
     "metrics": {
-      "runs": [],
-      "with_skill_hit_rate": null,
-      "false_positive_rate": null,
-      "false_negative_rate": null,
-      "stability": null,
-      "filled_by": null,
-      "filled_at": null
+      "runs": [
+        {
+          "repeat": 1,
+          "assessments": { "t01": true, "t02": true, "t03": true, "t04": true, "t05": true, "t06": true, "t07": true, "t08": true, "t09": true, "t10": true, "t11": false, "t12": false, "t13": false, "t14": false, "t15": false, "t16": true, "t17": false, "t18": false, "t19": false, "t20": false },
+          "mismatches_vs_expect": ["t16（expect=false，实际=true：description 适用列表含「配置或脚本变更」，一次性脚本会触发技能再走快路径）"]
+        },
+        {
+          "repeat": 2,
+          "assessments": { "t01": true, "t02": true, "t03": true, "t04": true, "t05": true, "t06": true, "t07": true, "t08": true, "t09": true, "t10": true, "t11": false, "t12": false, "t13": false, "t14": false, "t15": false, "t16": true, "t17": false, "t18": false, "t19": false, "t20": false },
+          "mismatches_vs_expect": ["t16"]
+        },
+        {
+          "repeat": 3,
+          "assessments": { "t01": true, "t02": true, "t03": true, "t04": true, "t05": true, "t06": true, "t07": true, "t08": true, "t09": true, "t10": true, "t11": false, "t12": false, "t13": false, "t14": false, "t15": false, "t16": true, "t17": false, "t18": false, "t19": false, "t20": false },
+          "mismatches_vs_expect": ["t16"]
+        }
+      ],
+      "with_skill_hit_rate": 1.0,
+      "false_positive_rate": 0.1,
+      "false_negative_rate": 0.0,
+      "stability": 1.0,
+      "filled_by": "session-agent-self-assessment（执行者按 v1.7.0 description 的触发/让位语义逐条自评 ×3；非真人会话实测，结论供人工复核）",
+      "filled_at": "2026-11-01T18:00:00Z"
     }
   }
 }
