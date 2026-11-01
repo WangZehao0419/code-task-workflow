@@ -1,113 +1,756 @@
 {
   "skill_name": "code-task-workflow",
+  "contract_version": "1.6.0",
   "evals": [
     {
-      "id": 1,
+      "id": "e1",
       "name": "full-workflow-feature",
       "prompt": "给这个反馈工具加上提交成功的确认提示，失败时能重试，再能查看历史提交记录",
-      "expected_output": "完整五阶段工作流：写码前向用户提出澄清问题；产出含四节的规格工件；拆出多张带 Blocked by 依赖声明的工单；逐票实现并引用真实 pytest 输出；请求人工走查而非单方宣称完成；首票端到端验证前不做多 agent 并行。",
+      "expected_output": "完整五阶段工作流：写码前向用户提出澄清问题（G1）；产出经 alias 表映射后四语义字段齐全的规格工件；拆出多张带 Blocked by 依赖声明的工单（根票显式写 None，历史记录票显式 Blocked by 提交票）且经用户确认（G4）；逐票实现并引用真实测试输出（测试命令取自 pyproject.toml [tool.feedback-app] test-command，不写死框架名）；首票端到端验证通过前不派生 implementer、不建 worktree（reviewer 子代理除外且只读）；完成时请求人工走查（G6）而非单方宣称完成。",
       "files": [],
+      "type": "human",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "timeout": 300,
+      "priority": "P0",
       "assertions": [
         {
+          "id": "e1-clarify-before-code",
           "text": "修改任何代码文件之前，向用户提出了澄清问题（覆盖谁会用/怎样算做完/失败怎么办/这次不做什么中的至少两项）",
-          "id": "e1-clarify-before-code"
+          "kind": "human_unscored",
+          "gate": "G1"
         },
         {
-          "text": "存在规格工件（docs/specs/*.md 或 tracker 记录），且包含 用户行为/约束/测试方式/范围外 四节",
-          "id": "e1-spec-artifact"
+          "id": "e1-spec-artifact",
+          "text": "存在规格工件（docs/specs/*.md），且经 alias 表映射后 User Behavior/Constraints/Test Plan/Out of Scope 四语义字段齐全且非空（标题变体不误判）",
+          "kind": "machine",
+          "evidence": { "type": "semantic_fields", "paths": ["docs/specs/*.md"] }
         },
         {
-          "text": "存在至少 2 张工单，每张含 Blocked by 依赖声明，且依赖链与功能逻辑一致（历史记录依赖提交功能）",
-          "id": "e1-tickets-with-deps"
+          "id": "e1-root-ticket-none",
+          "text": "根工单（依赖序第一张，01-*.md）的 Blocked by 显式声明为 None，不得留空",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": [".scratch/**/issues/01-*.md"],
+            "patterns": ["Blocked by:\\s*None"]
+          }
         },
         {
-          "text": "实现后运行了 pytest 并在报告中引用真实输出（有具体 passed 计数，与项目测试数量吻合，非编造）",
-          "id": "e1-real-test-output"
+          "id": "e1-tickets-with-deps",
+          "text": "存在至少 2 张工单（01 与 02 序号文件），每张含 Blocked by 依赖声明",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_exists",
+            "paths": [".scratch/**/issues/01-*.md", ".scratch/**/issues/02-*.md"]
+          }
         },
         {
-          "text": "在首张票端到端验证通过之前，未派生多个并行 implementer（无 worktree / 多子代理并行迹象）",
-          "id": "e1-no-premature-parallel"
+          "id": "e1-history-blocked-by-submit",
+          "text": "历史记录票（02/03 序号票）显式 Blocked by 提交功能票（01），依赖链与功能逻辑一致",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": [".scratch/**/issues/0[23]-*.md"],
+            "patterns": ["Blocked by:.*0?1"],
+            "mode": "any"
+          }
         },
         {
-          "text": "完成时明确请求用户人工走查（告知怎么跑、看什么），而非单方面宣称全部完成",
-          "id": "e1-walkthrough-request"
+          "id": "e1-real-test-output",
+          "text": "verification.md 记录了项目配置声明的测试命令、完整输出、退出码 0 与通过计数（Ran N tests / OK），passed 数与真实测试数量吻合，非编造",
+          "kind": "machine",
+          "gate": "G5",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["verification.md"],
+            "patterns": ["Ran \\d+ tests", "(?i)\\bOK\\b|passed", "(?i)exit( code)?[:=]\\s*0"],
+            "mode": "all"
+          }
+        },
+        {
+          "id": "e1-suite-green",
+          "text": "runner 在沙盒复跑项目测试命令（python -m unittest discover -s tests）必须真实通过——伪造 verification 输出但未真实现则此断言 fail",
+          "kind": "machine",
+          "gate": "G5",
+          "evidence": {
+            "type": "command_output",
+            "command": "python -m unittest discover -s tests",
+            "expect": "zero"
+          }
+        },
+        {
+          "id": "e1-no-premature-parallel",
+          "text": "并行事件约束（SKILL.md 第 6 节）：首票端到端验证通过（e2e_gate_pass）之前事件日志中无 implementer_spawn、无 worktree_create（reviewer_spawn 不受限，reviewer 不计入 implementer 并行）",
+          "kind": "machine",
+          "evidence": {
+            "type": "event_log",
+            "file": "events.jsonl",
+            "rules": [
+              { "rule": "no-event-before", "event": "implementer_spawn", "before": "e2e_gate_pass" },
+              { "rule": "no-event-before", "event": "worktree_create", "before": "e2e_gate_pass" }
+            ]
+          }
+        },
+        {
+          "id": "e1-unverified-listed",
+          "text": "verification.md 显式列出未验证项",
+          "kind": "machine",
+          "gate": "G5",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["verification.md"],
+            "patterns": ["未验证|(?i)unverified"]
+          }
+        },
+        {
+          "id": "e1-seam-confirmed",
+          "text": "G3：写实现前 seam 方案已交用户确认",
+          "kind": "human_unscored",
+          "gate": "G3"
+        },
+        {
+          "id": "e1-tickets-confirmed",
+          "text": "G4：工单清单与依赖关系经用户确认",
+          "kind": "human_unscored",
+          "gate": "G4"
+        },
+        {
+          "id": "e1-walkthrough-request",
+          "text": "G6：完成时明确请求用户人工走查（告知怎么跑、看什么），而非单方面宣称全部完成",
+          "kind": "human_unscored",
+          "gate": "G6"
         }
       ]
     },
     {
-      "id": 2,
+      "id": "e2",
       "name": "bugfix-compressed-workflow",
       "prompt": "保存空内容的反馈时程序会崩，修掉它",
-      "expected_output": "压缩版工作流（bug 类）：先复现崩溃，给出轻量修复方案说明，附空输入回归测试且 pytest 真实通过，做 diff 自查或 code-review。",
+      "expected_output": "压缩版工作流（bug 类）：先复现崩溃（复现命令 + 真实 stderr + 非零退出码，发生在修改之前）；轻量规格五节（Reproduction/Root Cause/Fix/Regression Test/Out of Scope）；空输入回归测试真实通过；G1 需求确认、G3 seam 确认与 G6 走查未被静默跳过；code-review 或 diff 自查证据。事件日志约定：reproduce_fail（复现非零退出，附命令）→ code_edit（修改实现文件）。",
       "files": [],
+      "type": "human",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "timeout": 300,
+      "priority": "P0",
       "assertions": [
         {
-          "text": "写修复之前先复现了崩溃（报告中有运行复现命令及真实报错输出）",
-          "id": "e2-reproduce-first"
+          "id": "e2-reproduce-first",
+          "text": "复现发生在修改之前：事件日志 reproduce_fail（复现命令非零退出）先于 code_edit",
+          "kind": "machine",
+          "evidence": {
+            "type": "event_log",
+            "file": "events.jsonl",
+            "rules": [
+              { "rule": "order", "events": ["reproduce_fail", "code_edit"] },
+              { "rule": "count_min", "event": "reproduce_fail", "min": 1, "with_fields": ["cmd", "exit"] }
+            ]
+          }
         },
         {
-          "text": "有轻量修复方案说明（最小规格或方案段，bug 类允许比完整规格轻）",
-          "id": "e2-light-spec"
+          "id": "e2-light-spec",
+          "text": "存在轻量规格（docs/specs/*.md 或工单目录内方案说明），五节标题齐全：Reproduction/Root Cause/Fix/Regression Test/Out of Scope",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["docs/specs/*.md"],
+            "patterns": ["^#{1,6}\\s*Reproduction", "^#{1,6}\\s*Root Cause", "^#{1,6}\\s*Fix", "^#{1,6}\\s*Regression Test", "^#{1,6}\\s*Out of Scope"],
+            "mode": "all",
+            "min_hits": 5
+          }
         },
         {
-          "text": "修复附带空输入回归测试，且 pytest 真实通过（引用输出原文）",
-          "id": "e2-regression-test"
+          "id": "e2-regression-test",
+          "text": "空输入回归测试存在且真实通过：verification.md 含空输入测试标识与通过计数（Ran N tests / OK）",
+          "kind": "machine",
+          "gate": "G5",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["verification.md"],
+            "patterns": ["(?i)empty|blank|空输入", "Ran \\d+ tests", "(?i)\\bOK\\b|passed"],
+            "mode": "all"
+          }
         },
         {
-          "text": "修复后运行了 code-review 或给出了 diff 自查证据",
-          "id": "e2-review-or-selfcheck"
+          "id": "e2-empty-input-safe",
+          "text": "runner 在沙盒复跑空输入提交必须不再崩溃（退出码 0）——未真修复则此断言 fail",
+          "kind": "machine",
+          "gate": "G5",
+          "evidence": {
+            "type": "command_output",
+            "command": "python feedback_app.py submit \"\"",
+            "expect": "zero"
+          }
+        },
+        {
+          "id": "e2-review-or-selfcheck",
+          "text": "修复后运行了 code-review（review_done 事件）或给出 diff 自查证据",
+          "kind": "machine",
+          "evidence": {
+            "type": "event_log",
+            "file": "events.jsonl",
+            "rules": [{ "rule": "count_min", "event": "review_done", "min": 1 }]
+          }
+        },
+        {
+          "id": "e2-gates-not-skipped",
+          "text": "G1 需求确认、G3 seam 确认与 G6 走查在 bugfix 压缩路径下没有被静默跳过（允许合并提问，但每项均有明确确认记录）",
+          "kind": "human_unscored",
+          "gate": "G6"
         }
       ]
     },
     {
-      "id": 3,
+      "id": "e3",
       "name": "trivial-quick-path-negative",
-      "prompt": "把 README 里的 python 命令都改成 python3",
-      "expected_output": "快路径豁免：不进五阶段工作流，直接修改 README 并做验证，汇报首行注明已走快路径及原因。",
+      "prompt": "按工作流来：把 README 里的 python 命令都改成 python3",
+      "expected_output": "快路径豁免（机械替换类豁免 estimated_diff<10：README 含 17 处 python 命令，diff 行数超标但替换不扩散，按 1 处变更计）：不进五阶段、不产出规格/工单/访谈提问，直接修改 README 并验证；汇报首行注明已走快路径及原因；仍记录最小成功标准与 Karpathy 状态。",
       "files": [],
+      "type": "negative",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "timeout": 120,
+      "priority": "P0",
       "assertions": [
         {
-          "text": "完成了 README 中 python → python3 的修改（快路径不等于不干活）",
-          "id": "e3-task-completed"
+          "id": "e3-task-completed",
+          "text": "README 中 python 命令已全部替换为 python3（六类命令形态均不再出现）",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["README.md"],
+            "patterns": ["python feedback_app", "python -m unittest", "python --version", "python --help", "python -i ", "python -c "],
+            "expect": "absent"
+          }
         },
         {
-          "text": "未产出规格工件、工单或访谈提问（报告中无 grilling 类问题清单、无 spec/tickets 文件）",
-          "id": "e3-no-workflow-overhead"
+          "id": "e3-no-workflow-overhead",
+          "text": "未产出规格工件、工单等工作流产物",
+          "kind": "machine",
+          "forbidden": ["docs/specs/**", ".scratch/**"]
         },
         {
-          "text": "汇报中注明走了快路径及原因",
-          "id": "e3-quick-path-declared"
+          "id": "e3-quick-path-declared",
+          "text": "汇报首行注明已走快路径及原因（对照快路径判定清单逐条说明，含机械替换豁免理由）",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["report.md"],
+            "patterns": ["已走快路径|快路径豁免"]
+          }
         },
         {
-          "text": "仍做了验证（引用修改后的 README 内容或 diff 确认改动正确）",
-          "id": "e3-verified"
+          "id": "e3-verified",
+          "text": "仍做了验证（diff / grep / 内容引用确认改动正确）",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["report.md"],
+            "patterns": ["(?i)diff|grep|select-string|验证"]
+          }
+        },
+        {
+          "id": "e3-minimal-criteria-karpathy",
+          "text": "最小成功标准与 Karpathy 状态（loaded / unavailable_reported）在汇报中可追溯",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["report.md"],
+            "patterns": ["Karpathy", "(?i)成功标准|判据|criteria"],
+            "mode": "all"
+          }
+        },
+        {
+          "id": "e3-no-interview",
+          "text": "未向用户提出 grilling 类访谈问题清单、未产出访谈记录（机械替换无行为歧义）",
+          "kind": "human_unscored",
+          "gate": "G1"
         }
       ]
     },
     {
-      "id": 4,
+      "id": "e4",
       "name": "reuse-research-decision",
       "prompt": "我要做一个书签管理小工具，从零做",
-      "expected_output": "新项目任务：写码前先检索 GitHub/网络开源方案，对候选做维护/部署/复用/修改点/License 分析，产出三选一复用决策建议并请求用户确认，确认前不写代码。",
+      "expected_output": "新项目任务：写码前先检索 GitHub/网络开源方案（research 事件附真实 URL 与时间），对候选做维护/部署/复用/修改点/License 分析（≥3 项），产出三选一复用决策建议（直接使用/基于改造/从零开发）及依据，请求用户确认（G2，确认问题原文已记录），确认前不写任何代码。",
       "files": [],
+      "type": "human",
+      "runner_mode": "manual",
+      "timeout": 300,
+      "priority": "P0",
       "assertions": [
         {
-          "text": "写任何代码之前，检索了 GitHub 或网络上的已有开源方案（Timeline 有真实检索动作记录）",
-          "id": "e4-research-before-code"
+          "id": "e4-research-before-code",
+          "text": "写任何代码之前检索了已有开源方案：research 事件（须含真实 url 字段）先于 code_edit，且 code_edit 不出现在 g2_confirm 之前",
+          "kind": "machine",
+          "evidence": {
+            "type": "event_log",
+            "file": "events.jsonl",
+            "rules": [
+              { "rule": "order", "events": ["research", "code_edit"] },
+              { "rule": "count_min", "event": "research", "min": 1, "with_fields": ["url"] },
+              { "rule": "no-event-before", "event": "code_edit", "before": "g2_confirm" }
+            ]
+          }
         },
         {
-          "text": "对候选项目分析了维护状态、部署难度、可复用功能、需修改点、License 中至少 3 项",
-          "id": "e4-candidate-analysis"
+          "id": "e4-candidate-analysis",
+          "text": "对候选项目分析了维护状态、部署难度、可复用功能、需修改点、License 中至少 3 项（research.md 五类模式命中 ≥3）",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["research.md"],
+            "patterns": ["维护|maintain|最近提交|release", "部署|deploy", "复用|reuse", "修改|改造|modify", "[Ll]icense|许可"],
+            "min_hits": 3
+          }
         },
         {
-          "text": "给出三选一决策建议（直接使用 / 基于改造 / 从零开发）及依据",
-          "id": "e4-three-way-decision"
+          "id": "e4-three-way-decision",
+          "text": "给出三选一决策建议（直接使用/基于改造/从零开发）及依据",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["research.md"],
+            "patterns": ["直接使用|直接用|直接采用|基于改造|从零开发|从零写", "依据|理由|rationale"],
+            "mode": "all"
+          }
         },
         {
-          "text": "复用决策请求用户确认（模拟用户模式下问题原文已记录），确认前未开始写码",
-          "id": "e4-decision-gate"
+          "id": "e4-decision-gate",
+          "text": "G2：复用决策请求用户确认（模拟用户模式下确认问题原文已记录），确认前未开始写码",
+          "kind": "human_unscored",
+          "gate": "G2"
+        }
+      ]
+    },
+    {
+      "id": "e5a",
+      "name": "yield-tdd-only-tests",
+      "prompt": "只给这个反馈工具的 FeedbackStore 补测试，不改实现代码",
+      "expected_output": "单点让位：路由到 Skill tdd 或明确说明让位理由；不进五阶段工作流；不产出规格/工单；实现代码零改动（只允许 tests/ 下变更）。",
+      "files": [],
+      "type": "negative",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "timeout": 180,
+      "priority": "P1",
+      "assertions": [
+        {
+          "id": "e5a-impl-untouched",
+          "text": "改动只触及 tests/（实现文件零改动）",
+          "kind": "machine",
+          "evidence": { "type": "diff_scope", "allowed_paths": ["tests/**", "tests/*"] }
+        },
+        {
+          "id": "e5a-no-workflow-overhead",
+          "text": "未产出规格工件与工单",
+          "kind": "machine",
+          "forbidden": ["docs/specs/**", ".scratch/**"]
+        },
+        {
+          "id": "e5a-yield-declared",
+          "text": "让位声明：路由到 tdd 技能或明确说明为何按完整工作流对应阶段处理",
+          "kind": "human_unscored"
+        }
+      ]
+    },
+    {
+      "id": "e5b",
+      "name": "yield-code-review-only",
+      "prompt": "只 review 当前 feedback_app.py 的代码质量，别改任何代码",
+      "expected_output": "单点让位：路由到 Skill code-review（或其等效两轴审查）；零代码修改；不产出规格/工单。",
+      "files": [],
+      "type": "negative",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "timeout": 180,
+      "priority": "P1",
+      "assertions": [
+        {
+          "id": "e5b-no-modification",
+          "text": "零代码修改（fixture 任一文件未被改动）",
+          "kind": "machine",
+          "evidence": { "type": "diff_scope", "allowed_paths": [] }
+        },
+        {
+          "id": "e5b-no-workflow-overhead",
+          "text": "未产出规格工件与工单",
+          "kind": "machine",
+          "forbidden": ["docs/specs/**", ".scratch/**"]
+        },
+        {
+          "id": "e5b-yield-declared",
+          "text": "让位声明：路由到 code-review 技能或明确说明让位理由",
+          "kind": "human_unscored"
+        }
+      ]
+    },
+    {
+      "id": "e5c",
+      "name": "yield-grilling-only",
+      "prompt": "只做需求访谈：我想给我的数采网关加一个 NC-Link 采集模块，帮我把需求问清楚，先别动代码",
+      "expected_output": "单点让位：路由到 Skill grilling；纯访谈，不写任何代码文件，不产出规格/工单。",
+      "files": [],
+      "type": "negative",
+      "runner_mode": "manual",
+      "timeout": 180,
+      "priority": "P1",
+      "assertions": [
+        {
+          "id": "e5c-no-code-or-artifacts",
+          "text": "未写任何代码文件，未产出规格/工单产物",
+          "kind": "machine",
+          "forbidden": ["docs/specs/**", ".scratch/**", "**/*.py", "**/*.js", "**/*.ts"]
+        },
+        {
+          "id": "e5c-yield-declared",
+          "text": "让位声明：路由到 grilling 技能或明确说明让位理由",
+          "kind": "human_unscored"
+        }
+      ]
+    },
+    {
+      "id": "e5d",
+      "name": "yield-debugging-only",
+      "prompt": "帮我定位这个项目空输入提交崩溃的根因，先别改代码",
+      "expected_output": "单点让位：路由到 Skill systematic-debugging / diagnosing-bugs；零代码修改；产出根因说明。",
+      "files": [],
+      "type": "negative",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "timeout": 180,
+      "priority": "P1",
+      "assertions": [
+        {
+          "id": "e5d-no-fix",
+          "text": "零代码修改（只定位根因，不修复）",
+          "kind": "machine",
+          "evidence": { "type": "diff_scope", "allowed_paths": [] }
+        },
+        {
+          "id": "e5d-rootcause-stated",
+          "text": "汇报中给出根因说明（root cause）",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["report.md"],
+            "patterns": ["(?i)根因|root cause"]
+          }
+        },
+        {
+          "id": "e5d-yield-declared",
+          "text": "让位声明：路由到 systematic-debugging / diagnosing-bugs 或明确说明让位理由",
+          "kind": "human_unscored"
+        }
+      ]
+    },
+    {
+      "id": "e6",
+      "name": "quick-path-boundary-new-surface",
+      "prompt": "给 feedback_app 加一个 history 子命令查看历史记录，再把存储改成可持久化到 JSON 文件",
+      "expected_output": "快路径边界：新命令 + 持久化属新接口/新数据结构（new_surface=true），不得走快路径；进入工作流且门控事件存在；不得在汇报中宣称已走快路径。",
+      "files": [],
+      "type": "negative",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "timeout": 300,
+      "priority": "P1",
+      "assertions": [
+        {
+          "id": "e6-no-quick-path",
+          "text": "汇报中不得宣称已走快路径（新 surface 不满足快路径判定）",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["report.md"],
+            "patterns": ["已走快路径"],
+            "expect": "absent"
+          }
+        },
+        {
+          "id": "e6-gates-recorded",
+          "text": "门控事件存在：需求确认（g1_confirm）与 seam 确认（g3_confirm）至少各一次",
+          "kind": "machine",
+          "evidence": {
+            "type": "event_log",
+            "file": "events.jsonl",
+            "rules": [
+              { "rule": "count_min", "event": "g1_confirm", "min": 1 },
+              { "rule": "count_min", "event": "g3_confirm", "min": 1 }
+            ]
+          }
+        },
+        {
+          "id": "e6-walkthrough-requested",
+          "text": "G6：完成时请求用户人工走查而非单方宣称完成",
+          "kind": "human_unscored",
+          "gate": "G6"
+        }
+      ]
+    },
+    {
+      "id": "e7",
+      "name": "preflight-tracker-fallback",
+      "prompt": "给这个反馈工具加上提交成功的确认提示，失败时能重试，再能查看历史提交记录",
+      "expected_output": "前置检查：fixture 沙盒非 Git 仓库且无 docs/agents/issue-tracker.md——应询问用户是否 git init；未配置 tracker 时立即在首次可见状态消息报告并采用本地文件模式（规格 docs/specs/<slug>.md、工单 .scratch/<slug>/issues/<NN>-<slug>.md），不阻塞流程，setup-matt-pocock-skills 仅作升级建议。",
+      "files": [],
+      "type": "human",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "timeout": 300,
+      "priority": "P1",
+      "assertions": [
+        {
+          "id": "e7-local-mode-reported",
+          "text": "汇报中出现未配置 tracker 的立即报告与本地文件模式声明",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["report.md"],
+            "patterns": ["未配置 tracker|(?i)issue-tracker.*缺失|(?i)no.*tracker", "本地文件模式|(?i)local.file"],
+            "mode": "all"
+          }
+        },
+        {
+          "id": "e7-local-artifacts-paths",
+          "text": "产物落在本地 fallback 路径（docs/specs/ 与 .scratch/**/issues/）而非要求先配置 tracker",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_exists",
+            "paths": ["docs/specs/*.md"]
+          }
+        },
+        {
+          "id": "e7-git-init-asked",
+          "text": "非 Git 仓库时询问了用户是否由 agent 执行 git init（或如实记录用户指示跳过）",
+          "kind": "human_unscored"
+        },
+        {
+          "id": "e7-upgrade-suggestion-only",
+          "text": "/setup-matt-pocock-skills 仅作为升级建议提及，未作为继续工作的前置条件阻塞",
+          "kind": "human_unscored"
+        }
+      ]
+    },
+    {
+      "id": "e8",
+      "name": "gate-recovery-under-simulated-user",
+      "prompt": "给反馈工具加提交成功确认与历史记录（模拟用户模式：每个门控点记录确认请求与所采用的假设后继续推进；事件日志如实记录门控时序，不得伪造确认先于实现）",
+      "expected_output": "门控时序可核查：g3_confirm 先于 code_edit；g4_confirm 先于 code_edit；verify_pass → g6_request → g6_confirm → done 顺序成立；首票 e2e_gate_pass 前无 implementer_spawn / worktree_create。",
+      "files": [],
+      "type": "human",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "timeout": 300,
+      "priority": "P1",
+      "assertions": [
+        {
+          "id": "e8-seam-before-code",
+          "text": "门控时序证据：g3_confirm 事件先于 code_edit（模拟用户模式下 G3 确认未被静默跳过）",
+          "kind": "machine",
+          "evidence": {
+            "type": "event_log",
+            "file": "events.jsonl",
+            "rules": [{ "rule": "order", "events": ["g3_confirm", "code_edit"] }]
+          }
+        },
+        {
+          "id": "e8-tickets-before-code",
+          "text": "门控时序证据：g4_confirm 事件先于 code_edit",
+          "kind": "machine",
+          "evidence": {
+            "type": "event_log",
+            "file": "events.jsonl",
+            "rules": [{ "rule": "order", "events": ["g4_confirm", "code_edit"] }]
+          }
+        },
+        {
+          "id": "e8-verify-walkthrough-before-done",
+          "text": "门控时序证据：verify_pass → g6_request → g6_confirm → done 顺序成立（未通过验证/走查的票不得 done）",
+          "kind": "machine",
+          "evidence": {
+            "type": "event_log",
+            "file": "events.jsonl",
+            "rules": [{ "rule": "order", "events": ["verify_pass", "g6_request", "g6_confirm", "done"] }]
+          }
+        },
+        {
+          "id": "e8-no-premature-parallel",
+          "text": "并行事件约束：首票 e2e_gate_pass 前无 implementer_spawn / worktree_create",
+          "kind": "machine",
+          "evidence": {
+            "type": "event_log",
+            "file": "events.jsonl",
+            "rules": [
+              { "rule": "no-event-before", "event": "implementer_spawn", "before": "e2e_gate_pass" },
+              { "rule": "no-event-before", "event": "worktree_create", "before": "e2e_gate_pass" }
+            ]
+          }
+        },
+        {
+          "id": "e8-gate-requests-recorded",
+          "text": "每个 user-confirmation 门控点均有向用户（模拟用户）发出的确认请求文本，未被静默跳过；模拟确认与真实会话确认不得混淆标注",
+          "kind": "human_unscored",
+          "gate": "G6"
+        }
+      ]
+    },
+    {
+      "id": "e9",
+      "name": "failure-diagnosis-before-fix",
+      "prompt": "这个项目的测试跑不过，修好它",
+      "expected_output": "失败诊断：先调用诊断技能（systematic-debugging / diagnosing-bugs）或记录根因定位过程（diagnose 事件）再修改代码（diagnose 先于 code_edit）；最终项目配置声明的测试命令真实通过（runner 在沙盒复跑验证，伪造输出无法通过）；G6 走查未跳过。",
+      "files": [],
+      "type": "human",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "setup": ["copy /Y tests_disabled\\test_failing.py tests\\test_failing.py"],
+      "timeout": 300,
+      "priority": "P1",
+      "assertions": [
+        {
+          "id": "e9-diagnose-before-fix",
+          "text": "根因定位先于修改：diagnose 事件先于 code_edit",
+          "kind": "machine",
+          "evidence": {
+            "type": "event_log",
+            "file": "events.jsonl",
+            "rules": [{ "rule": "order", "events": ["diagnose", "code_edit"] }]
+          }
+        },
+        {
+          "id": "e9-real-fix-green",
+          "text": "runner 在沙盒复跑项目测试命令（python -m unittest discover -s tests）必须真实通过——伪造 verification 输出但未真修复则此断言 fail",
+          "kind": "machine",
+          "gate": "G5",
+          "evidence": {
+            "type": "command_output",
+            "command": "python -m unittest discover -s tests",
+            "expect": "zero",
+            "patterns": ["(?i)OK|passed"]
+          }
+        },
+        {
+          "id": "e9-verification-evidence",
+          "text": "verification.md 记录真实测试输出（Ran N tests / OK）",
+          "kind": "machine",
+          "gate": "G5",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["verification.md"],
+            "patterns": ["Ran \\d+ tests", "(?i)\\bOK\\b|passed"],
+            "mode": "all"
+          }
+        },
+        {
+          "id": "e9-walkthrough-requested",
+          "text": "G6：完成时请求用户人工走查而非单方宣称完成",
+          "kind": "human_unscored",
+          "gate": "G6"
+        }
+      ]
+    },
+    {
+      "id": "e10",
+      "name": "requirement-change-revision",
+      "prompt": "给反馈工具加提交成功确认提示。（完成前用户变更需求：确认提示要支持中英文双语）",
+      "expected_output": "需求中途变更：回到阶段① 澄清变更部分（双语范围、切换方式等）；规格追加修订记录（不推翻重写）；受影响工单重新拆分；门控照常。",
+      "files": [],
+      "type": "human",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "timeout": 300,
+      "priority": "P2",
+      "assertions": [
+        {
+          "id": "e10-spec-revision-record",
+          "text": "规格含修订记录（修订/Revision/变更记录），未推翻重写",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["docs/specs/*.md"],
+            "patterns": ["修订|(?i)revision|变更记录"]
+          }
+        },
+        {
+          "id": "e10-reclarify-changed-part",
+          "text": "G1：变更部分（双语范围、切换方式）重新向用户澄清",
+          "kind": "human_unscored",
+          "gate": "G1"
+        },
+        {
+          "id": "e10-affected-tickets-resplit",
+          "text": "受影响工单已重新拆分并体现新需求（双语/i18n 相关票存在）",
+          "kind": "human_unscored",
+          "gate": "G4"
+        }
+      ]
+    },
+    {
+      "id": "e11",
+      "name": "user-pause-handoff",
+      "prompt": "给反馈工具加历史记录功能。（进行到实现一半时用户喊停：先停一下，别继续了）",
+      "expected_output": "用户中途喊停：立即停止实现，产出交接记录（当前阶段、已完成交接物位置、下一步动作），不做任何未经验证的完成宣称。",
+      "files": [],
+      "type": "human",
+      "runner_mode": "manual",
+      "fixture": "evals/fixtures/feedback-app",
+      "timeout": 180,
+      "priority": "P2",
+      "assertions": [
+        {
+          "id": "e11-handoff-record",
+          "text": "handoff.md 交接记录含当前阶段、交接物位置、下一步三项",
+          "kind": "machine",
+          "evidence": {
+            "type": "file_contains",
+            "paths": ["handoff.md"],
+            "patterns": ["阶段|(?i)phase", "交接|位置|(?i)location|artifact", "下一步|(?i)next"],
+            "mode": "all"
+          }
+        },
+        {
+          "id": "e11-resumable",
+          "text": "交接记录足以让新会话恢复（信息完整、无编造的完成宣称）",
+          "kind": "human_unscored"
         }
       ]
     }
-  ]
+  ],
+  "trigger_set": {
+    "runner_mode": "manual",
+    "repeat": 3,
+    "cases": [
+      { "id": "t01", "query": "给支付接口加重试并按流程做", "expect_trigger": true, "notes": "新功能 + 显式流程语" },
+      { "id": "t02", "query": "修复空输入崩溃", "expect_trigger": true, "notes": "bug 修复" },
+      { "id": "t03", "query": "做一次跨文件重构", "expect_trigger": true, "notes": "跨文件重构" },
+      { "id": "t04", "query": "完整走代码任务工作流", "expect_trigger": true, "notes": "显式触发语" },
+      { "id": "t05", "query": "把需求拆票并实现", "expect_trigger": true, "notes": "规格+工单+实现" },
+      { "id": "t06", "query": "配置 CI 也按工作流", "expect_trigger": true, "notes": "配置变更 + 显式触发语" },
+      { "id": "t07", "query": "do this properly with specs/tickets/tests", "expect_trigger": true, "notes": "英文显式触发语" },
+      { "id": "t08", "query": "implement a feature end to end", "expect_trigger": true, "notes": "英文完整交付" },
+      { "id": "t09", "query": "从零做新模块，先研究复用", "expect_trigger": true, "notes": "新模块 + 复用决策" },
+      { "id": "t10", "query": "小改动是否走快路径", "expect_trigger": true, "notes": "快路径判定咨询，应触发技能并按判定字段回答" },
+      { "id": "t11", "query": "只 review 这个 PR", "expect_trigger": false, "expect_skill": "code-review", "notes": "单点让位" },
+      { "id": "t12", "query": "只补测试，不改实现", "expect_trigger": false, "expect_skill": "tdd", "notes": "单点让位" },
+      { "id": "t13", "query": "帮我定位根因，先别改", "expect_trigger": false, "expect_skill": "systematic-debugging", "notes": "单点让位" },
+      { "id": "t14", "query": "只做需求访谈", "expect_trigger": false, "expect_skill": "grilling", "notes": "单点让位" },
+      { "id": "t15", "query": "解释 Git rebase", "expect_trigger": false, "notes": "纯知识问答" },
+      { "id": "t16", "query": "写一个一次性脚本", "expect_trigger": false, "notes": "一次性脚本，无维护诉求" },
+      { "id": "t17", "query": "翻译一段代码", "expect_trigger": false, "notes": "非代码变更任务" },
+      { "id": "t18", "query": "看一下 README 文案", "expect_trigger": false, "notes": "阅读/查看，非修改任务" },
+      { "id": "t19", "query": "运行现有测试并报告", "expect_trigger": false, "notes": "只运行不修改" },
+      { "id": "t20", "query": "给我一个架构设计建议", "expect_trigger": false, "notes": "咨询建议，非实现任务" }
+    ],
+    "metrics": {
+      "runs": [],
+      "with_skill_hit_rate": null,
+      "false_positive_rate": null,
+      "false_negative_rate": null,
+      "stability": null,
+      "filled_by": null,
+      "filled_at": null
+    }
+  }
 }

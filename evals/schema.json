@@ -1,0 +1,297 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "code-task-workflow eval contract v1.6.0",
+  "description": "评测契约：场景定义、断言、触发测试集与 run-log。校验器 scripts/validate_evals.py 按本文件手写实现（不依赖 jsonschema 库）。兼容性约定：id/name/prompt/expected_output/files/assertions 为 v1.5 兼容字段，永久保留；type/runner_mode 等为 v1.6 新增。语义必需字段别名表与 references/phases.md 阶段② 的 canonical schema 保持一致。",
+  "type": "object",
+  "required": ["skill_name", "evals"],
+  "properties": {
+    "skill_name": { "type": "string", "const": "code-task-workflow" },
+    "contract_version": { "type": "string" },
+    "evals": { "type": "array", "items": { "$ref": "#/definitions/eval_case" } },
+    "trigger_set": { "$ref": "#/definitions/trigger_set" }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "semantic_fields": {
+      "description": "规格四语义字段与标题别名表（唯一机器事实源，与 phases.md 阶段② canonical schema 一致）。判定规则：规格文档的标题经此表映射后，四个语义字段必须全部存在且非空。",
+      "user_behavior": {
+        "canonical": "User Behavior",
+        "aliases": ["Problem Statement", "Solution", "User Stories", "用户行为"]
+      },
+      "constraints": {
+        "canonical": "Constraints",
+        "aliases": ["Constraints", "Implementation Decisions", "约束"]
+      },
+      "test_plan": {
+        "canonical": "Test Plan",
+        "aliases": ["Test Plan", "Testing Decisions", "测试方法", "测试方式"]
+      },
+      "out_of_scope": {
+        "canonical": "Out of Scope",
+        "aliases": [],
+        "note": "无别名，标题必须命中 Out of Scope（大小写不敏感）；bugfix 轻量规格同此。"
+      }
+    },
+    "gate_registry": {
+      "description": "门控编号参考（与 SKILL.md 第 5 节一致）。eval 断言引用 G 编号时：user-confirmation 类断言 kind 必须为 human_unscored；evidence-based 类（G5）kind 为 machine。",
+      "G1": { "name": "需求确认", "type": "user-confirmation" },
+      "G2": { "name": "复用决策", "type": "user-confirmation" },
+      "G3": { "name": "测试 seam 确认", "type": "user-confirmation" },
+      "G4": { "name": "工单拆分确认", "type": "user-confirmation" },
+      "G5": { "name": "真实验证与 review 完成", "type": "evidence-based" },
+      "G6": { "name": "用户人工走查确认", "type": "user-confirmation" },
+      "G7": { "name": "并行升级确认", "type": "user-confirmation" }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": [
+            "file_exists",
+            "file_contains",
+            "semantic_fields",
+            "command_output",
+            "event_log",
+            "diff_scope"
+          ]
+        },
+        "paths": {
+          "description": "file_exists/file_contains/semantic_fields：断言目标路径，相对沙盒根（fixture 副本 + 回填证据）。",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "patterns": {
+          "description": "file_contains：正则模式列表；command_output：输出匹配模式。",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "mode": { "enum": ["any", "all"] },
+        "expect": {
+          "description": "file_exists：present=须存在 / absent=须不存在；command_output：zero|nonzero 期望退出码。",
+          "enum": ["present", "absent", "zero", "nonzero"]
+        },
+        "command": { "type": "string" },
+        "file": { "description": "event_log：事件日志文件路径（JSONL）。", "type": "string" },
+        "rules": {
+          "description": "event_log 规则列表：no-event-before（X 不得出现在 Y 首次之前）、count_max、count_min、order。",
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "allowed_paths": {
+          "description": "diff_scope：改动只允许触及的路径 glob 列表（相对沙盒根）。",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "assertion": {
+      "type": "object",
+      "required": ["id", "text", "kind"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "text": { "description": "自然语言断言描述（人类评审用）。", "type": "string" },
+        "kind": {
+          "description": "machine=机器可判定（须附 evidence 或 forbidden）；human_unscored=用户确认/走查类，不参与机器判分，不得伪装机器通过。",
+          "enum": ["machine", "human_unscored"]
+        },
+        "gate": {
+          "description": "关联门控编号（G1-G7）。user-confirmation 门控的断言必须 human_unscored；G5 断言必须 machine。",
+          "pattern": "^G[1-7]$"
+        },
+        "evidence": { "$ref": "#/definitions/evidence" },
+        "forbidden": {
+          "description": "违规产物 glob 列表：任一命中即 fail（negative 断言常用）。",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "eval_case": {
+      "type": "object",
+      "required": [
+        "id", "name", "prompt", "expected_output", "files",
+        "assertions", "type", "runner_mode", "priority"
+      ],
+      "properties": {
+        "id": { "type": ["string", "integer"], "description": "v1.6 起约定使用字符串（如 e1）。" },
+        "name": { "type": "string" },
+        "prompt": { "type": "string" },
+        "expected_output": { "type": "string" },
+        "files": { "type": "array", "items": {}, "description": "v1.5 兼容字段：场景输入文件清单（通常空，实际输入由 fixture 提供）。" },
+        "assertions": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/assertion" } },
+        "type": {
+          "description": "machine=行为可机器判定；human=含人工确认环节；negative=违规行为必须不出现。",
+          "enum": ["machine", "human", "negative"]
+        },
+        "runner_mode": {
+          "description": "script=runner 可纯脚本判定（fixture+command+证据）；manual=须会话内真实运行后回填证据，无证据时只能标 unrun。",
+          "enum": ["script", "manual"]
+        },
+        "fixture": {
+          "description": "相对技能根的 fixture 目录（如 evals/fixtures/feedback-app），runner 复制到沙盒。",
+          "type": "string"
+        },
+        "setup": {
+          "description": "沙盒内逐条执行的准备命令（工作目录=沙盒根）。",
+          "type": "array", "items": { "type": "string" }
+        },
+        "command": {
+          "description": "验证命令（工作目录=沙盒根）；runner_mode=script 时必填。",
+          "type": "string"
+        },
+        "depends_on": {
+          "description": "前置 case id 列表（须存在且无环）。",
+          "type": "array", "items": { "type": ["string", "integer"] }
+        },
+        "timeout": { "type": "number", "exclusiveMinimum": 0, "description": "单条命令超时秒数。" },
+        "priority": { "enum": ["P0", "P1", "P2"] }
+      },
+      "additionalProperties": false
+    },
+    "trigger_case": {
+      "type": "object",
+      "required": ["id", "query", "expect_trigger"],
+      "properties": {
+        "id": { "type": "string" },
+        "query": { "type": "string" },
+        "expect_trigger": { "type": "boolean" },
+        "expect_skill": {
+          "description": "期望让位到的专项技能（仅 expect_trigger=false 且属让位类时填写）。",
+          "type": ["string", "null"]
+        },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "trigger_set": {
+      "type": "object",
+      "required": ["runner_mode", "repeat", "cases"],
+      "properties": {
+        "runner_mode": { "const": "manual", "description": "路由行为必须真实 LLM 会话判定，属 manual。" },
+        "repeat": { "type": "integer", "minimum": 1 },
+        "cases": { "type": "array", "minItems": 20, "items": { "$ref": "#/definitions/trigger_case" } },
+        "metrics": {
+          "description": "回填的统计结果（3 次重复后由会话填写；无回填时不得声明路由可回归结论）。",
+          "type": "object",
+          "properties": {
+            "runs": { "type": "array", "items": { "type": "object" } },
+            "with_skill_hit_rate": { "type": ["number", "null"] },
+            "false_positive_rate": { "type": ["number", "null"] },
+            "false_negative_rate": { "type": ["number", "null"] },
+            "stability": { "type": ["string", "null"], "description": "3 次重复间路由结果一致率描述。" },
+            "filled_by": { "type": ["string", "null"] },
+            "filled_at": { "type": ["string", "null"] }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "run_log": {
+      "description": "scripts/run_evals.py 每次运行的归档结构，落 evals/runs/<run_id>/run-log.json。",
+      "type": "object",
+      "required": ["run_id", "config", "started_at", "cases", "summary"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "config": { "enum": ["baseline", "with-skill", "mutation", "evidence"] },
+        "repeat": { "type": "integer" },
+        "started_at": { "type": "string" },
+        "finished_at": { "type": "string" },
+        "python": { "type": "string" },
+        "cases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "runner_mode", "status", "verdict"],
+            "properties": {
+              "id": { "type": ["string", "integer"] },
+              "name": { "type": "string" },
+              "runner_mode": { "enum": ["script", "manual"] },
+              "status": {
+                "description": "pass|fail|unrun|manual_required|error。未运行的 case 只能是 unrun/manual_required，不得标 pass。",
+                "enum": ["pass", "fail", "unrun", "manual_required", "error"]
+              },
+              "verdict": {
+                "description": "与 status 同步的判定结论；unrun 不得写成 pass。",
+                "enum": ["pass", "fail", "unrun"]
+              },
+              "repeat_results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "iteration": { "type": "integer" },
+                    "verdict": { "enum": ["pass", "fail", "unrun", "error"] },
+                    "assertions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "verdict": { "enum": ["pass", "fail", "unrun", "human_unscored"] },
+                          "detail": { "type": "string" }
+                        },
+                        "required": ["id", "verdict"]
+                      }
+                    },
+                    "actual_output": { "type": "string" },
+                    "evidence_dir": { "type": ["string", "null"] },
+                    "timing": {
+                      "type": "object",
+                      "properties": {
+                        "seconds": { "type": ["number", "null"] }
+                      }
+                    },
+                    "cost": {
+                      "description": "成本画像仅在 eval runner 采集；不可得时键位保留、值置 null 并在 notes 标注。",
+                      "type": "object",
+                      "properties": {
+                        "tokens": { "type": ["integer", "null"] },
+                        "tool_calls": { "type": ["integer", "null"] },
+                        "notes": { "type": ["string", "null"] }
+                      }
+                    },
+                    "reviewer": {
+                      "description": "manual 证据回填时的评审方；机器判定一律为 null。",
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["iteration", "verdict"]
+                }
+              },
+              "notes": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "total": { "type": "integer" },
+            "pass": { "type": "integer" },
+            "fail": { "type": "integer" },
+            "unrun": { "type": "integer" },
+            "manual_required": { "type": "integer" },
+            "error": { "type": "integer" },
+            "human_unscored_assertions": { "type": "integer" },
+            "script_pass_rate": { "type": ["number", "null"] },
+            "variance": { "type": ["string", "null"] }
+          },
+          "required": ["total", "pass", "fail", "unrun"]
+        },
+        "degradation_alert": {
+          "description": "与最近一次对照 config 的 run-log 比较：tokens 或 latency 相对退化超过 50% 时报警，定位到具体 case。",
+          "type": ["object", "null"],
+          "properties": {
+            "triggered": { "type": "boolean" },
+            "items": { "type": "array", "items": { "type": "object" } }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

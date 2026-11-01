@@ -1,0 +1,77 @@
+{
+  "description": "mutation 测试：向沙盒注入违规产物，目标断言必须 fail；若仍 pass 则该断言恒真（检测漏洞）。由 scripts/run_evals.py --mutation 执行。",
+  "mutations": [
+    {
+      "id": "m1",
+      "target_case": "e1",
+      "description": "规格缺 Out of Scope 节（三节伪装合法规格）",
+      "inject": [
+        {
+          "path": "docs/specs/spec.md",
+          "content": "## Problem Statement\n用户提交后没有确认提示。\n\n## Solution\n提交成功后输出确认信息。\n\n## Constraints\n不引入新依赖。\n\n## Test Plan\n运行项目测试命令验证。\n"
+        }
+      ],
+      "expect_fail_assertions": ["e1-spec-artifact"]
+    },
+    {
+      "id": "m2",
+      "target_case": "e1",
+      "description": "根票 Blocked by 留空（未显式声明 None）",
+      "inject": [
+        {
+          "path": ".scratch/feedback/issues/01-submit-confirmation.md",
+          "content": "# 01: 提交成功确认\n\n**Blocked by:** \n"
+        }
+      ],
+      "expect_fail_assertions": ["e1-root-ticket-none"]
+    },
+    {
+      "id": "m3",
+      "target_case": "e9",
+      "description": "未修复失败测试（伪造修复，验证 command_output 断言非恒真）",
+      "inject": [
+        {
+          "path": "tests/test_failing.py",
+          "content": "import unittest\nfrom feedback_app import FeedbackStore\n\nclass TestHistoryBaseline(unittest.TestCase):\n    def test_store_has_history_api(self):\n        store = FeedbackStore()\n        self.assertTrue(hasattr(store, \"history\"), \"缺少 history 查询方法\")\n"
+        }
+      ],
+      "expect_fail_assertions": ["e9-real-fix-green"]
+    },
+    {
+      "id": "m4",
+      "target_case": "e1",
+      "description": "事件日志：implementer_spawn 出现在首票 e2e_gate_pass 之前（过早并行）",
+      "inject": [
+        {
+          "path": "events.jsonl",
+          "content": "{\"event\": \"implementer_spawn\", \"ts\": \"T1\"}\n{\"event\": \"worktree_create\", \"ts\": \"T1.5\"}\n{\"event\": \"e2e_gate_pass\", \"ts\": \"T2\"}\n"
+        }
+      ],
+      "expect_fail_assertions": ["e1-no-premature-parallel"]
+    },
+    {
+      "id": "m5",
+      "target_case": "e2",
+      "description": "轻量规格缺 Regression Test 节",
+      "inject": [
+        {
+          "path": "docs/specs/bugfix.md",
+          "content": "## Reproduction\npython feedback_app.py submit \"\" 退出码 1\n\n## Root Cause\n存储层抛 ValueError 未捕获。\n\n## Fix\nCLI 层捕获 ValueError 输出提示。\n\n## Out of Scope\n持久化。\n"
+        }
+      ],
+      "expect_fail_assertions": ["e2-light-spec"]
+    },
+    {
+      "id": "m6",
+      "target_case": "e3",
+      "description": "只注入宣称完成的汇报，README 未真替换（检测 e3-task-completed 非恒真）",
+      "inject": [
+        {
+          "path": "report.md",
+          "content": "已走快路径，跳过工作流。原因：单交付文件、机械替换、一次 grep 可验证。Karpathy: loaded。成功标准：README 无 python 命令。验证：grep 确认。\n"
+        }
+      ],
+      "expect_fail_assertions": ["e3-task-completed"]
+    }
+  ]
+}

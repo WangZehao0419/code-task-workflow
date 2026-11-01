@@ -1,3 +1,5 @@
 # 临时目录与产物不进版本库
 temp/
 .scratch/
+evals/runs/
+__pycache__/

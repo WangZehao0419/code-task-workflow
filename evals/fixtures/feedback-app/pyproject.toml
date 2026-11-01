@@ -1,0 +1,8 @@
+[project]
+name = "feedback-app"
+version = "1.0.0"
+description = "反馈工具 fixture 基线：提交 / 存储；确认提示、失败重试、历史记录为待实现缺口（见 evals.json e1）"
+
+# 测试命令唯一声明处：eval 断言引用“项目配置声明的测试命令”，不写死测试框架名
+[tool.feedback-app]
+test-command = "python -m unittest discover -s tests -v"
